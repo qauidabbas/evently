@@ -1,0 +1,108 @@
+generator client {
+  provider        = "prisma-client-js"
+  previewFeatures = ["postgresqlExtensions"]
+}
+
+datasource db {
+  provider   = "postgresql"
+  url        = env("DATABASE_URL")
+  extensions = [vector]
+}
+
+model User {
+  id                     String         @id @default(uuid())
+  tokenIdentifier        String         @unique // Keeping Clerk ID during transition
+  email                  String         @unique
+  name                   String
+  passwordHash           String?
+  isEmailVerified        Boolean        @default(false)
+  image                  String?
+  city                   String?
+  state                  String?
+  country                String?
+  interests              String[]
+  hasCompletedOnboarding Boolean        @default(false)
+  createdAt              DateTime       @default(now())
+  updatedAt              DateTime       @updatedAt
+  
+  // Relations
+  events                 Event[]        @relation("EventOrganizer") // Events hosted by this user
+  registrations          Registration[] // Events this user is attending
+  sessions               Session[]
+}
+
+model Session {
+  id               String   @id @default(uuid())
+  userId           String
+  user             User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  refreshTokenHash String
+  deviceInfo       String?
+  ip               String?
+  createdAt        DateTime @default(now())
+  lastActiveAt     DateTime @default(now())
+  revokedAt        DateTime?
+
+  @@index([userId])
+}
+
+model Event {
+  id                String   @id @default(uuid())
+  title             String
+  description       String
+  slug              String   @unique
+  
+  organizerId       String
+  organizer         User     @relation("EventOrganizer", fields: [organizerId], references: [id])
+  organizerName     String
+  
+  category          String
+  tags              String[]
+  
+  startDate         DateTime
+  endDate           DateTime
+  timezone          String
+  
+  locationType      String   // "physical" or "online"
+  venue             String?
+  address           String?
+  city              String
+  state             String?
+  country           String
+  
+  capacity          Int
+  ticketType        String   // "free" or "paid"
+  ticketPrice       Float?
+  registrationCount Int      @default(0)
+  
+  coverImage        String?
+  themeColor        String?
+  
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  registrations     Registration[]
+}
+
+model Registration {
+  id            String   @id @default(uuid())
+  
+  eventId       String
+  event         Event    @relation(fields: [eventId], references: [id])
+  
+  userId        String
+  user          User     @relation(fields: [userId], references: [id])
+  
+  attendeeName  String
+  attendeeEmail String
+  
+  qrCode        String   @unique
+  
+  checkedIn     Boolean  @default(false)
+  checkedInAt   DateTime?
+  
+  status        String   // "confirmed" or "cancelled"
+  
+  registeredAt  DateTime @default(now())
+
+  @@unique([eventId, userId]) // Prevent double registration
+}
